@@ -11,3 +11,8 @@ Start the network and create a channel named `mychannel` using the following com
 ```bash
 ./network.sh up createChannel -ca -c mychannel
 
+### 2. Basic Chaincode Installation
+
+Install the basic chaincode on the network:
+
+```bash
