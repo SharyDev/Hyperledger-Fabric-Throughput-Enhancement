@@ -1,0 +1,187 @@
+./network.sh up createChannel -ca -c mychannel 
+
+//Install basic chaincode
+ORDERER_CA=${PWD}/organizations/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem
+
+//ORG1 Basic varset
+export CORE_PEER_TLS_ENABLED=true
+export CORE_PEER_LOCALMSPID="Org1MSP"
+export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+export CORE_PEER_ADDRESS=localhost:7051
+
+export PATH=$PATH:$PWD/../bin/
+
+export FABRIC_CFG_PATH=$PWD/../config/
+export ORDERER_CA=${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+
+
+//ORG2
+export CORE_PEER_TLS_ENABLED=true
+export CORE_PEER_LOCALMSPID="Org2MSP"
+export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp
+export CORE_PEER_ADDRESS=localhost:9051
+
+export PATH=$PATH:$PWD/../bin/
+
+export FABRIC_CFG_PATH=$PWD/../config/
+export ORDERER_CA=${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+
+//network up
+./network.sh up createChannel -ca
+
+
+
+
+//deploy the chaincode
+./network.sh deployCC -ccn basic -ccp ../asset-transfer-basic/chaincode-javascript -ccl javascript
+
+//invoke
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" -C mychannel -n basic --peerAddresses localhost:7051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" --peerAddresses localhost:9051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" -c '{"function":"InitLedger","Args":[]}'
+
+##query
+peer chaincode query -C mychannel -n basic -c '{"Args":["GetAllAssets"]}' | jq
+
+
+//update
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" -C mychannel -n basic --peerAddresses localhost:7051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt" --peerAddresses localhost:9051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt" -c '{"function":"TransferAsset","Args":["asset6","Christopher"]}'
+
+
+//register peer
+export PATH=$PATH:${PWD}/../bin
+export FABRIC_CA_CLIENT_HOME=${PWD}/organizations/peerOrganizations/org1.example.com/
+
+fabric-ca-client register --caname ca-org1 --id.name peer11 --id.secret peer11pw --id.type peer --tls.certfiles ${PWD}/organizations/fabric-ca/org1/tls-cert.pem
+
+mkdir -p organizations/peerOrganizations/org1.example.com/peers/peer11.org1.example.com
+
+fabric-ca-client enroll -u https://peer11:peer11pw@localhost:7054 --caname ca-org1 -M ${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer11.org1.example.com/msp --csr.hosts peer11.org1.example.com --tls.certfiles ${PWD}/organizations/fabric-ca/org1/tls-cert.pem
+
+cp ${PWD}/organizations/peerOrganizations/org1.example.com/msp/config.yaml ${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer11.org1.example.com/msp/config.yaml
+
+fabric-ca-client enroll -u https://peer11:peer11pw@localhost:7054 --caname ca-org1 -M ${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer11.org1.example.com/tls --enrollment.profile tls --csr.hosts peer11.org1.example.com --csr.hosts localhost --tls.certfiles ${PWD}/organizations/fabric-ca/org1/tls-cert.pem
+
+cp ${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer11.org1.example.com/tls/tlscacerts/* ${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer11.org1.example.com/tls/ca.crt
+
+cp ${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer11.org1.example.com/tls/signcerts/* ${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer11.org1.example.com/tls/server.crt
+
+cp ${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer11.org1.example.com/tls/keystore/* ${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer11.org1.example.com/tls/server.key
+
+//import docker
+docker-compose -f compose/compose-peer11org1.yaml up -d
+
+//check channel
+peer channel list
+
+CORE_PEER_ADDRESS=localhost:951 peer channel list
+
+//join channel
+CORE_PEER_ADDRESS=localhost:951 peer channel join -b channel-artifacts/mychannel.block
+
+//join ledger or chaincode
+CORE_PEER_ADDRESS=localhost:951 peer lifecycle chaincode install basic.tar.gz
+
+Query:
+CORE_PEER_ADDRESS=localhost:951 peer chaincode query -C mychannel -n basic -c '{"Args":["GetAllAssets"]}'
+
+peer11: 851
+peer11: 951
+peer11: 1051
+peer11: 1151
+peer11: 1251//
+peer11: 1351
+
+<---Change Config--->
+
+//Envirement Var
+export PATH=${PWD}/../bin:$PATH
+export FABRIC_CFG_PATH=${PWD}/../config
+export ORDERER_CA=${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+export CORE_PEER_ADDRESS=localhost:7051
+export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+ export CORE_PEER_LOCALMSPID=Org1MSP
+ 
+ 
+ORDERER_CA=${PWD}/organizations/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem
+CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+CORE_PEER_ADDRESS=localhost:7051
+CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem
+CORE_PEER_LOCALMSPID=Org1MSP
+
+
+//
+ORDERER_CONTAINER=orderer.example.com
+CH_NAME=myChannel
+TLS_ROOT_CA=${PWD}/organizations/ordererOrganizations/example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+CORE_PEER_LOCALMSPID=Org1MSP
+CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+FABRIC_CFG_PATH=$PWD/../config/
+CHANNEL_NAME=mychannel
+//Fetch
+peer channel fetch config config_block.pb -o $ORDERER_CONTAINER -c $CHANNEL_NAME --tls --cafile $TLS_ROOT_CA
+
+//JSON
+configtxlator proto_decode --input config_block.pb --type common.Block --output config_block.json
+
+//Query
+jq ".data.data[0].payload.data.config" config_block.json > config.json
+
+//Copy
+
+cp config.json modified_config.json
+
+//CalculateDIfference
+configtxlator proto_encode --input config.json --type common.Config --output config.pb
+
+configtxlator proto_encode --input modified_config.json --type common.Config --output modified_config.pb
+
+configtxlator compute_update --channel_id $CHANNEL_NAME --original config.pb --updated modified_config.pb --output config_update.pb
+
+//Recode
+configtxlator proto_decode --input config_update.pb --type common.ConfigUpdate --output config_update.json
+
+echo '{"payload":{"header":{"channel_header":{"channel_id":"'$CHANNEL_NAME'", "type":2}},"data":{"config_update":'$(cat config_update.json)'}}}' | jq . > config_update_in_envelope.json
+
+configtxlator proto_encode --input config_update_in_envelope.json --type common.Envelope --output config_update_in_envelope.pb
+
+//Sign
+peer channel signconfigtx -f config_update_in_envelope.pb
+
+//Update
+CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/ordererOrganizations/example.com/users/Admin@example.com/msp
+CORE_PEER_ADDRESS=localhost:7050
+CORE_PEER_LOCALMSPID=OrdererMSP
+
+
+peer channel update -f config_update_in_envelope.pb -c $CHANNEL_NAME -o localhost:7050 --tls --cafile $ORDERER_CA
+
+//fix
+ORDERER_CA=${PWD}/organizations/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem
+CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+CORE_PEER_ADDRESS=localhost:7051
+CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem
+CORE_PEER_LOCALMSPID=Org1MSP
+
+//Final FIx
+CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/ordererOrganizations/example.com/users/Admin@example.com/msp
+CORE_PEER_ADDRESS=localhost:7050
+CORE_PEER_LOCALMSPID=OrdererMSP
+
+
+
+CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/ordererOrganizations/example.com/users/Admin@example.com/msp
+CORE_PEER_ADDRESS=localhost:7050
+CORE_PEER_LOCALMSPID=OrdererMSP
+
+//
+peer channel fetch config config_block.pb -o localhost:7050 -c $CHANNEL_NAME --tls --cafile $ORDERER_CA
+Order
+
+//caliper
+npx caliper launch manager --caliper-workspace ./ --caliper-networkconfig networks/networkConfig.yaml --caliper-benchconfig benchmarks/myAssetBenchmark.yaml --caliper-flow-only-test
+

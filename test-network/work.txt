@@ -1,0 +1,48 @@
+2092  ./network.sh deployCC -ccn basic -ccp ../asset-transfer-basic/chaincode-javascript -ccl javascript
+ 2093  configtxlator proto_encode --input config.json --type common.Config --output config.pb
+ 2094  configtxlator proto_encode --input modified_config.json --type common.Config --output modified_config.pb
+ 2095  configtxlator compute_update --channel_id $CH_NAME --original config.pb --updated modified_config.pb --output config_update.pb
+ 2096  configtxlator proto_decode --input config_update.pb --type common.ConfigUpdate --output config_update.json
+ 2097  echo '{"payload":{"header":{"channel_header":{"channel_id":"'$CH_NAME'", "type":2}},"data":{"config_update":'$(cat config_update.json)'}}}' | jq . > config_update_in_envelope.json
+ 2098  configtxlator proto_encode --input config_update_in_envelope.json --type common.Envelope --output config_update_in_envelope.pb
+ 2099  peer channel signconfigtx -f config_update_in_envelope.pb
+ CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+ CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/ordererOrganizations/example.com/users/Admin@example.com/msp
+
+ CORE_PEER_ADDRESS=localhost:7050
+
+ CORE_PEER_LOCALMSPID=OrdererMSP
+//or
+CHANNEL_NAME=mychannel
+CH_NAME=mychannel
+NEW_BATCH_TIMEOUT=${2:-"10s"}
+
+ORDERER_CA=${PWD}/organizations/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem
+CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+CORE_PEER_ADDRESS=localhost:7051
+CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem
+CORE_PEER_LOCALMSPID=Org1MSP
+
+//or end
+ peer channel update -f config_update_in_envelope.pb -c $CHANNEL_NAME -o localhost:7050 --tls --cafile $ORDERER_CA
+ 
+ 
+ ./network.sh deployCC -ccn basic -ccp ../asset-transfer-basic/chaincode-javascript -ccl javascript
+ 2106  history
+root@shahroz-Lenovo-G50-70:/home/shahroz/Downloads/Current/fabric-samples/test-network# 
+
+
+///
+
+
+
+ 2074  peer channel fetch config config_block.pb -o $ORDERER_CONTAINER -c $CH_NAME --tls --cafile $ORDERER_CA
+ 2075  peer channel fetch config config_block.pb -o $ORDERER_CONTAINER -c $CH_NAME --tls --cafile $ORDERER_CApeer channel fetch config config_block.pb -o localhost:7050 -c $CHANNEL_NAME --tls --cafile $ORDERER_CA
+ 2076  peer channel fetch config config_block.pb -o localhost:7050 -c $CHANNEL_NAME --tls --cafile $ORDERER_CA
+ 2077  configtxlator proto_decode --input config_block.pb --type common.Block --output config_block.json
+ 2078  jq ".data.data[0].payload.data.config" config_block.json > config.json
+ 2079  cp config.json modified_config.json
+ 2080  export PATH=$PATH:${PWD}/../bin
+ 2081  export FABRIC_CA_CLIENT_HOME=${PWD}/organizations/peerOrganizations/org1.example.com/
+ 2082  fabric-ca-client register --caname ca-org1 --id.name peer15 --id.secret peer15pw --id.type peer --tls.certfiles ${PWD}/organizations/fabric-ca/org1/tls-cert.pem
+
